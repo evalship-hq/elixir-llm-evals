@@ -20,9 +20,9 @@ jobs:
             deps
             _build
           key: mix-${{ runner.os }}-${{ hashFiles('.tool-versions', 'mix.lock') }}
-      # Compile now, so the first test case doesn't wait on it.
+      # Fails on compile warnings, with or without the secret.
       - run: mix deps.get && mix compile --warnings-as-errors
-      - run: ./tinyeval -n 3
+      - run: mix tinyeval -n 3
         if: env.ANTHROPIC_API_KEY != ''
       - run: echo "::notice::Add the ANTHROPIC_API_KEY repository secret to run the evals."
         if: env.ANTHROPIC_API_KEY == ''

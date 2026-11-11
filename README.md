@@ -7,9 +7,9 @@ An Elixir support bot whose AI call is tested on every pull request with [tinyev
 Clone the repo, or use it as a template. Then:
 
 ```sh
-mix deps.get && mix compile
+mix deps.get
 export ANTHROPIC_API_KEY=sk-ant-...
-./tinyeval
+mix tinyeval
 ```
 
 ```
@@ -25,11 +25,12 @@ All 3 evals passed (eval-results.json)
 
 - `lib/support.ex`: the support bot. `Support.answer/1` sends a message to Claude and returns the reply. Elixir has no official Anthropic SDK, so it calls the Messages API with [Req](https://hex.pm/packages/req).
 - `prompts/support.md`: the bot's system prompt, read at compile time.
-- `evals/worker.exs`: the tinyeval worker. `mix run` starts the app once, then the worker answers each test case.
+- `evals/worker.exs`: the tinyeval worker. `mix run` starts the app once, then `Tinyeval.worker/1` answers each test case.
 - `evals/support.sh`: three test cases and the checks on their replies.
 - `config/config.exs`: sends logs to stderr, as the worker's stdout carries the replies.
-- `tinyeval`: the eval runner, one bash file.
+- `mix.exs`: Req for the app, and [tinyeval](https://hex.pm/packages/tinyeval) for `mix tinyeval` and the worker.
 - `.github/workflows/evals.yml`: runs the evals on pull requests and on pushes to main.
+- `.github/dependabot.yml`: a weekly pull request when tinyeval, Req or an action has a new version.
 
 ## Use it for your app
 
@@ -37,15 +38,19 @@ All 3 evals passed (eval-results.json)
 2. Write your test cases in `evals/`. The [check lines](https://github.com/evalship-hq/tinyeval#writing-evals) are `contains`, `matches`, `json`, `judge` and a few more.
 3. In a Phoenix app, `mix run` starts your application, so the worker can call your contexts directly. Keep the endpoint's server off, as it is unless your config sets `server: true`. Copy the Logger line from `config/config.exs`, so logs stay off stdout.
 
-The worker reports a missing key, 401, 429, 5xx, timeouts and network errors as couldn't run, so an outage doesn't show as a failed eval. Keep that split when you swap in your own client. The worker line sets `MIX_QUIET=1`, so a recompile after an edit doesn't print into a reply.
+The worker raises `Tinyeval.CouldntRun` for a missing key, 401, 429, 5xx, timeouts and network errors. tinyeval counts those apart from failed evals, so an outage doesn't look like a broken prompt. An error in your own code becomes the reply, so its eval fails. Keep that split when you swap in your own client. The worker line sets `MIX_QUIET=1`, so a recompile after an edit doesn't print into a reply.
 
 ## In CI
 
 Add `ANTHROPIC_API_KEY` under **Settings** > **Secrets and variables** > **Actions**. The judge uses the same key.
 
-The workflow installs Erlang and Elixir from `.tool-versions`, caches `deps` and `_build`, and compiles. Then it runs each test case 3 times. A test case passes when at least 2 of the 3 runs pass. A failing eval fails the job, so you can require it before merging. The results go up as the `eval-results` artifact, also when evals fail.
+The workflow installs Erlang and Elixir from `.tool-versions`, caches `deps` and `_build`, and compiles. Then `mix tinyeval -n 3` runs each test case 3 times. A test case passes when at least 2 of the 3 runs pass. A failing eval fails the job, so you can require it before merging. The results go up as the `eval-results` artifact, also when evals fail.
 
-Without the secret, the workflow skips the evals and stays green. Pull requests from forks get no secrets, so their evals skip too.
+Without the secret, the workflow skips the evals and stays green. Pull requests from forks get no secrets, so their evals skip too. Dependabot's pull requests get no secrets either, so they skip the evals with the same notice.
+
+## Updating
+
+Run `mix deps.update tinyeval` for the latest tinyeval. Dependabot checks each week and opens a pull request for a new version.
 
 ## Compare pull requests with main
 
